@@ -1,0 +1,201 @@
+esphome:
+  name: roleta-krokowa
+  friendly_name: Roleta Salon
+  comment: "Roller blind control with 28BYJ-48 stepper motor"
+  project:
+    name: "arekp.rolety"
+    version: "1.0.0"
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+# Enable logging
+logger:
+  level: DEBUG
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: !secret api_encryption_key
+
+# WiFi connection
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  
+  # Enable fallback hotspot in case WiFi connection fails
+  ap:
+    ssid: "Roleta-Fallback"
+    password: "12345678"
+
+# Over-the-air firmware update
+ota:
+  password: !secret ota_password
+
+# NTP Time server
+time:
+  - platform: sntp
+    id: sntp_time
+    servers: 0.pool.ntp.org
+
+# ============================================================================
+# STEPPER MOTOR CONFIGURATION - 28BYJ-48 with ULN2003 Driver
+# ============================================================================
+
+stepper:
+  - platform: uln2003
+    id: my_stepper
+    pin_a: GPIO13
+    pin_b: GPIO12
+    pin_c: GPIO14
+    pin_d: GPIO27
+    
+    # Motor speed parameters
+    max_speed: 500 steps/s         # Maximum speed (400-800 steps/s optimal)
+    acceleration: 200 steps/s^2    # Acceleration rate
+    deceleration: 200 steps/s^2    # Deceleration rate
+    
+    # CRITICAL: Disable coils when motor stops to prevent overheating
+    # ULN2003 draws current continuously if enabled during idle
+    sleep_when_done: true
+    sleep_when_not_moving: true
+
+# ============================================================================
+# COVER (ROLLER BLIND) CONFIGURATION
+# ============================================================================
+
+cover:
+  - platform: stepper
+    id: my_cover
+    name: "Roleta Okno"
+    stepper_id: my_stepper
+    
+    # CALIBRATION REQUIRED:
+    # 28BYJ-48 motor: 1 rotation ≈ 4096 steps (with internal gearing)
+    # Measure how many steps your blind needs to fully open/close
+    # Full range from 0% (closed) to 100% (open)
+    # Start with ~20000 and adjust based on actual movement
+    full_steps: 20000
+    
+    # Optional: Uncomment if direction is inverted
+    # direction_inverted: true
+    
+    # Endpoint settings
+    has_position: true
+    assumed_state: false
+    
+    # Smooth operation
+    auto_advance_time: 1000 ms
+
+# ============================================================================
+# BINARY SENSORS - OPTIONAL: Limit switches for fully open/closed
+# ============================================================================
+
+binary_sensor:
+  # Fully closed position sensor (Optional)
+  - platform: gpio
+    id: limit_close
+    name: "Roleta - Pozycja Zamknięta"
+    pin:
+      number: GPIO32
+      mode: INPUT_PULLUP
+      inverted: true
+    filters:
+      - delayed_on: 100ms
+      - delayed_off: 100ms
+    
+  # Fully open position sensor (Optional)
+  - platform: gpio
+    id: limit_open
+    name: "Roleta - Pozycja Otwarta"
+    pin:
+      number: GPIO33
+      mode: INPUT_PULLUP
+      inverted: true
+    filters:
+      - delayed_on: 100ms
+      - delayed_off: 100ms
+
+# ============================================================================
+# BUTTONS - Manual control (Optional)
+# ============================================================================
+
+button:
+  - platform: template
+    id: btn_open
+    name: "Roleta - Otwórz"
+    on_press:
+      then:
+        - cover.open: my_cover
+  
+  - platform: template
+    id: btn_close
+    name: "Roleta - Zamknij"
+    on_press:
+      then:
+        - cover.close: my_cover
+  
+  - platform: template
+    id: btn_stop
+    name: "Roleta - Stop"
+    on_press:
+      then:
+        - cover.stop: my_cover
+
+# ============================================================================
+# SENSOR - Motor status and diagnostics
+# ============================================================================
+
+sensor:
+  # Current position in steps
+  - platform: template
+    id: stepper_position
+    name: "Roleta - Pozycja (Kroki)"
+    unit_of_measurement: "steps"
+    update_interval: 500ms
+    lambda: |-
+      return id(my_stepper).current_position;
+  
+  # Position in percentage
+  - platform: template
+    id: cover_position
+    name: "Roleta - Pozycja (%)"
+    unit_of_measurement: "%"
+    update_interval: 500ms
+    lambda: |-
+      if (id(my_stepper).max_steps == 0) return 0.0;
+      return (float(id(my_stepper).current_position) / id(my_stepper).max_steps) * 100.0;
+
+# ============================================================================
+# TEXT SENSOR - Device status and info
+# ============================================================================
+
+text_sensor:
+  - platform: template
+    id: device_status
+    name: "Roleta - Status"
+    update_interval: 1s
+    lambda: |-
+      if (id(my_stepper).is_running()) {
+        return std::string("Uruchamianie");
+      } else {
+        return std::string("Gotowy");
+      }
+
+# ============================================================================
+# AUTOMATION - Optional: Auto-close at sunset
+# ============================================================================
+
+# automation:
+#   - id: close_blind_at_sunset
+#     trigger:
+#       - platform: sun
+#         event: sunset
+#     action:
+#       - cover.close: my_cover
+
+# ============================================================================
+# END OF CONFIGURATION
+# ============================================================================
