@@ -1,0 +1,63 @@
+# ESPHome
+.esphome/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Build artifacts
+*.o
+*.a
+*.so
+.objects/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Secrets (NEVER commit sensitive data!)
+secrets.yaml
+secrets.yml
+
+# Logs
+*.log
+logs/
+*.jlog
+
+# Temporary files
+*.tmp
+*.temp
+.temp/
+
+# Backups
+*.bak
+*.backup
+*~
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Compiled firmware
+*.bin
+*.elf
+*.map
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# OTA firmware cache
+.ota/
+
+# Home Assistant
+.homeassistant/
+tts/
