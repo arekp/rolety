@@ -1,0 +1,46 @@
+esphome:
+  name: roleta-krokowa
+  friendly_name: Roleta Salon
+
+esp32:
+  board: esp32dev
+
+# Konfiguracja pinów dla ULN2003
+stepper:
+  - platform: uln2003
+    id: my_stepper
+    pin_a: GPIO13
+    pin_b: GPIO12
+    pin_c: GPIO14
+    pin_d: GPIO27
+    max_speed: 500
+    acceleration: 200
+    # Wyłącza cewki po zakończeniu ruchu (oszczędzanie energii)
+    sleep_when_done: true
+
+# Konfiguracja urządzenia typu "Roleta" (Cover)
+cover:
+  - platform: stepper
+    name: "Roleta Okno"
+    id: my_cover
+    stepper_id: my_stepper
+    
+    # KALIBRACJA:
+    # Liczba kroków dla pełnego rozwinięcia rolety
+    # Dla silnika 28BYJ-48: jeden obrót ≈ 4096 kroków
+    # Dostosuj wartość eksperymentalnie dla Twojej instalacji
+    full_steps: 20000
+
+    # Odkomentuj, jeśli kierunek jest odwrotny:
+    # direction_inverted: true
+
+logger:
+  level: INFO
+
+# Opcjonalnie: Home Assistant API
+api:
+  encryption:
+    key: !secret api_key
+
+ota:
+  password: !secret ota_password
