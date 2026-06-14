@@ -5,14 +5,14 @@ esphome:
 esp32:
   board: esp32dev
 
-# Konfiguracja pinów dla ULN2003
+# Konfiguracja pinów dla ULN2003 - NodeMCU v3
 stepper:
   - platform: uln2003
     id: my_stepper
-    pin_a: GPIO13
-    pin_b: GPIO12
-    pin_c: GPIO14
-    pin_d: GPIO27
+    pin_a: GPIO14      # D5
+    pin_b: GPIO12      # D6
+    pin_c: GPIO13      # D7
+    pin_d: GPIO27      # D8
     max_speed: 500
     acceleration: 200
     # Wyłącza cewki po zakończeniu ruchu (oszczędzanie energii)
