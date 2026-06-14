@@ -2,8 +2,8 @@ esphome:
   name: rolety1
   friendly_name: rolety1
 
-esp8266:
-  board: esp01_1m
+esp32:
+  board: esp32dev
 
 # ============================================
 # Wi-Fi Konfiguracja
@@ -41,6 +41,7 @@ ota:
 
 # ============================================
 # Stepper Motor - ULN2003 28BYJ-48
+# NodeMCU v3 pinning: D5-D8 → GPIO14, GPIO12, GPIO13, GPIO27
 # ============================================
 stepper:
   - platform: uln2003
@@ -76,9 +77,10 @@ cover:
 
 # ============================================
 # Przyciski Sterowania (GPIO)
+# NodeMCU v3: GPIO5 (D1), GPIO4 (D2), GPIO0 (D3)
 # ============================================
 binary_sensor:
-  # Przycisk "Do Góry" (GPIO5)
+  # Przycisk "Do Góry" (GPIO5 / D1)
   - platform: gpio
     pin:
       number: GPIO5
@@ -92,7 +94,7 @@ binary_sensor:
       then:
         - cover.open: my_cover
   
-  # Przycisk "Do Dołu" (GPIO4)
+  # Przycisk "Do Dołu" (GPIO4 / D2)
   - platform: gpio
     pin:
       number: GPIO4
@@ -106,7 +108,7 @@ binary_sensor:
       then:
         - cover.close: my_cover
   
-  # Przycisk "Stop" (GPIO0)
+  # Przycisk "Stop" (GPIO0 / D3)
   - platform: gpio
     pin:
       number: GPIO0
@@ -136,6 +138,16 @@ sensor:
     id: uptime_sensor
     update_interval: 60s
 
+  # Napięcie Zasilania (GPIO35 / A0)
+  - platform: adc
+    pin: GPIO35
+    attenuation: 11db
+    name: "Napięcie Zasilania"
+    id: power_voltage
+    update_interval: 60s
+    filters:
+      - multiply: 4.2  # Kalibracja dla dzielnika napięcia
+
 # ============================================
 # Text Sensors
 # ============================================
@@ -163,7 +175,7 @@ text_sensor:
 switch:
   # Restart
   - platform: restart
-    name: "Restart ESP8266"
+    name: "Restart NodeMCU v3"
     id: restart_switch
 
   # Safe Mode (do aktualizacji)
