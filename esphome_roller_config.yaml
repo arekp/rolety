@@ -4,6 +4,8 @@ esphome:
 
 esp32:
   board: esp32dev
+  framework:
+    type: esp-idf
 
 # ============================================
 # Wi-Fi Konfiguracja
@@ -56,24 +58,57 @@ stepper:
     sleep_when_done: true
 
 # ============================================
-# Cover (Roleta) z Stepper'em
+# Cover (Roleta) z Stepper'em - Template Cover
+# Nowa wersja dla ESPHome 2026.5.3+
 # ============================================
 cover:
-  - platform: stepper
+  - platform: template
     name: "Rolety1"
     id: my_cover
-    stepper_id: my_stepper
     
-    # Liczba kroków dla pełnego rozwinięcia
-    # 28BYJ-48: 4096 kroków = 1 pełny obrót
-    # Dostosuj eksperymentalnie dla Twojej instalacji!
-    full_steps: 20000
+    # Otwórz roletę (ustaw target na max)
+    open_action:
+      then:
+        - stepper.set_target:
+            id: my_stepper
+            target: 20000
+        - logger.log: "Roleta: otwieranie..."
     
-    # Odwróć kierunek ruchu (jeśli potrzebne)
-    # direction_inverted: false
+    # Zamknij roletę (ustaw target na 0)
+    close_action:
+      then:
+        - stepper.set_target:
+            id: my_stepper
+            target: 0
+        - logger.log: "Roleta: zamykanie..."
+    
+    # Zatrzymaj roletę (ustaw target na aktualną pozycję)
+    stop_action:
+      then:
+        - stepper.set_target:
+            id: my_stepper
+            target: !lambda 'return id(my_stepper).current_position;'
+        - logger.log: "Roleta: zatrzymana"
+    
+    # Oblicz aktualną operację
+    current_operation: !lambda |-
+      if (id(my_stepper).current_position == id(my_stepper).target_position) {
+        return cover::COVER_OPERATION_IDLE;
+      } else if (id(my_stepper).target_position > id(my_stepper).current_position) {
+        return cover::COVER_OPERATION_OPENING;
+      } else {
+        return cover::COVER_OPERATION_CLOSING;
+      }
+    
+    # Oblicz pozycję jako procent (0.0 = zamknięte, 1.0 = otwarte)
+    current_position: !lambda |-
+      return id(my_stepper).current_position / 20000.0;
     
     # Przywróć pozycję po restarcie
     restore_position: true
+    
+    # Włącz możliwość ustawienia pozycji na podstawie procentu (Home Assistant)
+    has_position: true
 
 # ============================================
 # Przyciski Sterowania (GPIO)
