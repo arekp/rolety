@@ -1,8 +1,9 @@
 esphome:
-  name: roleta-krokowa
-  friendly_name: Roleta Salon
-  platform: ESP32
-  board: esp32dev
+  name: rolety1
+  friendly_name: rolety1
+
+esp8266:
+  board: esp01_1m
 
 # ============================================
 # Wi-Fi Konfiguracja
@@ -10,42 +11,33 @@ esphome:
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
-  
-  # Fallback AP (gdy WiFi niedostępny)
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
   ap:
-    ssid: "Roleta-Krokowa-AP"
-    password: "12345678"
+    ssid: "Rolety1 Fallback Hotspot"
+    password: "2d890Nt9GLfM"
+
+captive_portal:
 
 # ============================================
-# Wdrażanie OTA (Over-The-Air)
-# ============================================
-ota:
-  password: !secret ota_password
-
-# ============================================
-# Home Assistant API
-# ============================================
-api:
-  encryption:
-    key: !secret api_key
-
-# ============================================
-# Logger
+# Enable logging
 # ============================================
 logger:
   level: INFO
-  # logs:
-  #   component: DEBUG
 
 # ============================================
-# MQTT (Opcjonalnie - do Home Assistant)
+# Enable Home Assistant API
 # ============================================
-mqtt:
-  broker: !secret mqtt_broker
-  username: !secret mqtt_user
-  password: !secret mqtt_password
-  discovery: true
-  discovery_prefix: homeassistant
+api:
+  encryption:
+    key: "d1K6Qe5PoLYRR0DO3qJanXc4JJPgnMPtkxVUfTIdvf4="
+
+# ============================================
+# OTA Updates
+# ============================================
+ota:
+  - platform: esphome
+    password: "da32dc05b4f8badde6840699cc6b25be"
 
 # ============================================
 # Stepper Motor - ULN2003 28BYJ-48
@@ -67,7 +59,7 @@ stepper:
 # ============================================
 cover:
   - platform: stepper
-    name: "Roleta Salon"
+    name: "Rolety1"
     id: my_cover
     stepper_id: my_stepper
     
@@ -79,17 +71,17 @@ cover:
     # Odwróć kierunek ruchu (jeśli potrzebne)
     # direction_inverted: false
     
-    # Opcjonalne: Przywróć pozycję po restarcie
-    # restore_position: true
+    # Przywróć pozycję po restarcie
+    restore_position: true
 
 # ============================================
 # Przyciski Sterowania (GPIO)
 # ============================================
 binary_sensor:
-  # Przycisk "Do Góry" (GPIO26)
+  # Przycisk "Do Góry" (GPIO5)
   - platform: gpio
     pin:
-      number: GPIO26
+      number: GPIO5
       mode: INPUT_PULLUP
       inverted: true
     name: "Przycisk Góra"
@@ -100,10 +92,10 @@ binary_sensor:
       then:
         - cover.open: my_cover
   
-  # Przycisk "Do Dołu" (GPIO25)
+  # Przycisk "Do Dołu" (GPIO4)
   - platform: gpio
     pin:
-      number: GPIO25
+      number: GPIO4
       mode: INPUT_PULLUP
       inverted: true
     name: "Przycisk Dół"
@@ -114,10 +106,10 @@ binary_sensor:
       then:
         - cover.close: my_cover
   
-  # Przycisk "Stop" (GPIO33)
+  # Przycisk "Stop" (GPIO0)
   - platform: gpio
     pin:
-      number: GPIO33
+      number: GPIO0
       mode: INPUT_PULLUP
       inverted: true
     name: "Przycisk Stop"
@@ -144,16 +136,6 @@ sensor:
     id: uptime_sensor
     update_interval: 60s
 
-  # Napięcie Zasilania (opcjonalne - wymaga ADC)
-  - platform: adc
-    pin: GPIO35
-    attenuation: 11db
-    name: "Napięcie Zasilania"
-    id: power_voltage
-    update_interval: 60s
-    filters:
-      - multiply: 4.2  # Kalibracja dla dzielnika napięcia
-
 # ============================================
 # Text Sensors
 # ============================================
@@ -166,9 +148,6 @@ text_sensor:
     ssid:
       name: "SSID"
       id: wifi_ssid
-    bssid:
-      name: "BSSID"
-      id: wifi_bssid
     mac_address:
       name: "MAC Address"
       id: wifi_mac
@@ -184,39 +163,13 @@ text_sensor:
 switch:
   # Restart
   - platform: restart
-    name: "Restart ESP32"
+    name: "Restart ESP8266"
     id: restart_switch
 
   # Safe Mode (do aktualizacji)
   - platform: safe_mode
     name: "Restart Safe Mode"
     id: safe_mode_switch
-
-# ============================================
-# Servos - Pozycjonowanie (opcjonalne)
-# ============================================
-# servo:
-#   - id: my_servo
-#     output: pwm_servo
-#     min_level: 0%
-#     max_level: 100%
-
-# ============================================
-# PWM Output (jeśli potrzebny)
-# ============================================
-# output:
-#   - platform: ledc
-#     pin: GPIO32
-#     id: pwm_servo
-#     frequency: 50 Hz
-
-# ============================================
-# Globalny Timer do Automatyki
-# ============================================
-interval:
-  - interval: 60s
-    then:
-      - logger.log: "System działa prawidłowo"
 
 # ============================================
 # Automatyzacja (Examples)
