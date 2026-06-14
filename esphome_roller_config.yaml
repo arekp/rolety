@@ -43,13 +43,14 @@ ota:
 
 # ============================================
 # Stepper Motor - ULN2003 28BYJ-48
-# NodeMCU v3 pinning: D5-D8 → GPIO14, GPIO12, GPIO13, GPIO27
+# NodeMCU v3 pinning: D5-D8 → GPIO14, GPIO2, GPIO13, GPIO27
+# Zmieniono GPIO12 na GPIO2 (GPIO12 to strapping pin)
 # ============================================
 stepper:
   - platform: uln2003
     id: my_stepper
     pin_a: GPIO14      # D5 → ULN2003 IN1
-    pin_b: GPIO12      # D6 → ULN2003 IN2
+    pin_b: GPIO2       # D4 → ULN2003 IN2 (zmieniono z GPIO12)
     pin_c: GPIO13      # D7 → ULN2003 IN3
     pin_d: GPIO27      # D8 → ULN2003 IN4
     max_speed: 500
