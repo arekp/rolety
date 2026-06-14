@@ -109,6 +109,13 @@ cover:
     
     # Włącz możliwość ustawienia pozycji na podstawie procentu (Home Assistant)
     has_position: true
+    
+    # Ustaw pozycję na podstawie procentu z Home Assistant
+    set_position_action:
+      then:
+        - stepper.set_target:
+            id: my_stepper
+            target: !lambda 'return pos * 20000.0;'
 
 # ============================================
 # Przyciski Sterowania (GPIO)
