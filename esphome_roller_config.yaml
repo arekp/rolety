@@ -226,26 +226,6 @@ switch:
     id: safe_mode_switch
 
 # ============================================
-# Automatyzacja (Examples)
-# ============================================
-automation:
-  # Otwórz roletę o 7:00 rano
-  - alias: "Otwórz roletę rano"
-    trigger:
-      platform: time
-      at: "07:00:00"
-    action:
-      - cover.open: my_cover
-  
-  # Zamknij roletę o 21:00
-  - alias: "Zamknij roletę wieczorem"
-    trigger:
-      platform: time
-      at: "21:00:00"
-    action:
-      - cover.close: my_cover
-
-# ============================================
 # Scripts (Możliwe sekwencje działań)
 # ============================================
 script:
