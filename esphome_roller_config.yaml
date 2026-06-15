@@ -5,7 +5,7 @@ esphome:
     board_build.f_cpu: 160000000L
 
 esp8266:
-  board: esp01_1m
+  board: nodemcuv2
 
 logger:
   level: ERROR
@@ -14,11 +14,11 @@ logger:
 api:
   batch_delay: 0ms
   encryption:
-    key: "flIgyK3JFxcxcMs="
+    key: "xxxxxx"
 
 ota:
   - platform: esphome
-    password: "xcxcxcccc"
+    password: "xxxxxxxx"
 
 wifi:
   ssid: !secret wifi_ssid
@@ -27,23 +27,62 @@ wifi:
   power_save_mode: NONE
   ap:
     ssid: "Rolety1 Fallback Hotspot"
-    password: "xxxxxxxx"
+    password: "xxxxxxx"
 
 captive_portal:
 
 substitutions:
   r1_name: "Roleta Lewa"
-  # PODZIELONE PRZEZ 2 (z 20000 na 10000) z racji FULL_STEP
-  r1_max_kroki: "10000"
+  r1_max_kroki: "42800"
   r2_name: "Roleta Prawa"
-  r2_max_kroki: "10000"
-  
-  # Prędkość również podzielona przez 2, aby zachować to samo tempo fizyczne
-  predkosc: "300" 
+  r2_max_kroki: "44100"
+  predkosc: "300"
   przyspieszenie: "80"
 
 preferences:
   flash_write_interval: 1h
+
+globals:
+  - id: r1_inverted
+    type: bool
+    restore_value: true
+    initial_value: 'false'
+
+  - id: r2_inverted
+    type: bool
+    restore_value: true
+    initial_value: 'false'
+
+switch:
+  - platform: template
+    name: "Roleta Lewa - odwrocony kierunek"
+    id: r1_invert_switch
+    entity_category: config
+    lambda: |-
+      return id(r1_inverted);
+    turn_on_action:
+      - globals.set:
+          id: r1_inverted
+          value: 'true'
+    turn_off_action:
+      - globals.set:
+          id: r1_inverted
+          value: 'false'
+
+  - platform: template
+    name: "Roleta Prawa - odwrocony kierunek"
+    id: r2_invert_switch
+    entity_category: config
+    lambda: |-
+      return id(r2_inverted);
+    turn_on_action:
+      - globals.set:
+          id: r2_inverted
+          value: 'true'
+    turn_off_action:
+      - globals.set:
+          id: r2_inverted
+          value: 'false'
 
 stepper:
   - platform: uln2003
@@ -55,8 +94,7 @@ stepper:
     max_speed: ${predkosc}
     acceleration: ${przyspieszenie}
     sleep_when_done: true
-    # MAGIA OPTYMALIZACJI: Pełny krok. Zmniejsza obciążenie ESP o połowę!
-    step_mode: FULL_STEP 
+    step_mode: FULL_STEP
 
   - platform: uln2003
     id: stepper_2
@@ -69,6 +107,75 @@ stepper:
     sleep_when_done: true
     step_mode: FULL_STEP
 
+button:
+  - platform: template
+    name: "Roleta Lewa - ustaw jako otwarta"
+    entity_category: config
+    on_press:
+      - stepper.report_position:
+          id: stepper_1
+          position: !lambda |-
+            return id(r1_inverted) ? ${r1_max_kroki} : 0;
+      - stepper.set_target:
+          id: stepper_1
+          target: !lambda |-
+            return id(r1_inverted) ? ${r1_max_kroki} : 0;
+      - cover.template.publish:
+          id: cover_1
+          position: 1.0
+          current_operation: IDLE
+
+  - platform: template
+    name: "Roleta Lewa - ustaw jako zamknieta"
+    entity_category: config
+    on_press:
+      - stepper.report_position:
+          id: stepper_1
+          position: !lambda |-
+            return id(r1_inverted) ? 0 : ${r1_max_kroki};
+      - stepper.set_target:
+          id: stepper_1
+          target: !lambda |-
+            return id(r1_inverted) ? 0 : ${r1_max_kroki};
+      - cover.template.publish:
+          id: cover_1
+          position: 0.0
+          current_operation: IDLE
+
+  - platform: template
+    name: "Roleta Prawa - ustaw jako otwarta"
+    entity_category: config
+    on_press:
+      - stepper.report_position:
+          id: stepper_2
+          position: !lambda |-
+            return id(r2_inverted) ? ${r2_max_kroki} : 0;
+      - stepper.set_target:
+          id: stepper_2
+          target: !lambda |-
+            return id(r2_inverted) ? ${r2_max_kroki} : 0;
+      - cover.template.publish:
+          id: cover_2
+          position: 1.0
+          current_operation: IDLE
+
+  - platform: template
+    name: "Roleta Prawa - ustaw jako zamknieta"
+    entity_category: config
+    on_press:
+      - stepper.report_position:
+          id: stepper_2
+          position: !lambda |-
+            return id(r2_inverted) ? 0 : ${r2_max_kroki};
+      - stepper.set_target:
+          id: stepper_2
+          target: !lambda |-
+            return id(r2_inverted) ? 0 : ${r2_max_kroki};
+      - cover.template.publish:
+          id: cover_2
+          position: 0.0
+          current_operation: IDLE
+
 cover:
   - platform: template
     name: ${r1_name}
@@ -78,7 +185,8 @@ cover:
     open_action:
       - stepper.set_target:
           id: stepper_1
-          target: 0
+          target: !lambda |-
+            return id(r1_inverted) ? ${r1_max_kroki} : 0;
       - cover.template.publish:
           id: cover_1
           current_operation: OPENING
@@ -86,7 +194,8 @@ cover:
     close_action:
       - stepper.set_target:
           id: stepper_1
-          target: ${r1_max_kroki}
+          target: !lambda |-
+            return id(r1_inverted) ? 0 : ${r1_max_kroki};
       - cover.template.publish:
           id: cover_1
           current_operation: CLOSING
@@ -94,26 +203,34 @@ cover:
     stop_action:
       - stepper.set_target:
           id: stepper_1
-          target: !lambda 'return id(stepper_1).current_position;'
+          target: !lambda |-
+            return id(stepper_1).current_position;
       - cover.template.publish:
           id: cover_1
           position: !lambda |-
-            return 1.0f - ((float) id(stepper_1).current_position / ${r1_max_kroki}.0f);
+            float raw = (float) id(stepper_1).current_position / ${r1_max_kroki}.0f;
+            float position = id(r1_inverted) ? raw : 1.0f - raw;
+            if (position < 0.0f) return 0.0f;
+            if (position > 1.0f) return 1.0f;
+            return position;
           current_operation: IDLE
 
     position_action:
       - stepper.set_target:
           id: stepper_1
-          target: !lambda 'return (1.0f - pos) * ${r1_max_kroki};'
+          target: !lambda |-
+            return id(r1_inverted) ? pos * ${r1_max_kroki} : (1.0f - pos) * ${r1_max_kroki};
       - cover.template.publish:
           id: cover_1
           current_operation: !lambda |-
-            if (id(stepper_1).current_position < id(stepper_1).target_position) {
-              return COVER_OPERATION_CLOSING;
-            } else if (id(stepper_1).current_position > id(stepper_1).target_position) {
-              return COVER_OPERATION_OPENING;
-            } else {
+            if (id(stepper_1).current_position == id(stepper_1).target_position) {
               return COVER_OPERATION_IDLE;
+            }
+            bool moving_to_higher_steps = id(stepper_1).current_position < id(stepper_1).target_position;
+            if (id(r1_inverted)) {
+              return moving_to_higher_steps ? COVER_OPERATION_OPENING : COVER_OPERATION_CLOSING;
+            } else {
+              return moving_to_higher_steps ? COVER_OPERATION_CLOSING : COVER_OPERATION_OPENING;
             }
 
   - platform: template
@@ -124,7 +241,8 @@ cover:
     open_action:
       - stepper.set_target:
           id: stepper_2
-          target: 0
+          target: !lambda |-
+            return id(r2_inverted) ? ${r2_max_kroki} : 0;
       - cover.template.publish:
           id: cover_2
           current_operation: OPENING
@@ -132,7 +250,8 @@ cover:
     close_action:
       - stepper.set_target:
           id: stepper_2
-          target: ${r2_max_kroki}
+          target: !lambda |-
+            return id(r2_inverted) ? 0 : ${r2_max_kroki};
       - cover.template.publish:
           id: cover_2
           current_operation: CLOSING
@@ -140,26 +259,34 @@ cover:
     stop_action:
       - stepper.set_target:
           id: stepper_2
-          target: !lambda 'return id(stepper_2).current_position;'
+          target: !lambda |-
+            return id(stepper_2).current_position;
       - cover.template.publish:
           id: cover_2
           position: !lambda |-
-            return 1.0f - ((float) id(stepper_2).current_position / ${r2_max_kroki}.0f);
+            float raw = (float) id(stepper_2).current_position / ${r2_max_kroki}.0f;
+            float position = id(r2_inverted) ? raw : 1.0f - raw;
+            if (position < 0.0f) return 0.0f;
+            if (position > 1.0f) return 1.0f;
+            return position;
           current_operation: IDLE
 
     position_action:
       - stepper.set_target:
           id: stepper_2
-          target: !lambda 'return (1.0f - pos) * ${r2_max_kroki};'
+          target: !lambda |-
+            return id(r2_inverted) ? pos * ${r2_max_kroki} : (1.0f - pos) * ${r2_max_kroki};
       - cover.template.publish:
           id: cover_2
           current_operation: !lambda |-
-            if (id(stepper_2).current_position < id(stepper_2).target_position) {
-              return COVER_OPERATION_CLOSING;
-            } else if (id(stepper_2).current_position > id(stepper_2).target_position) {
-              return COVER_OPERATION_OPENING;
-            } else {
+            if (id(stepper_2).current_position == id(stepper_2).target_position) {
               return COVER_OPERATION_IDLE;
+            }
+            bool moving_to_higher_steps = id(stepper_2).current_position < id(stepper_2).target_position;
+            if (id(r2_inverted)) {
+              return moving_to_higher_steps ? COVER_OPERATION_OPENING : COVER_OPERATION_CLOSING;
+            } else {
+              return moving_to_higher_steps ? COVER_OPERATION_CLOSING : COVER_OPERATION_OPENING;
             }
 
 interval:
@@ -168,25 +295,37 @@ interval:
       - cover.template.publish:
           id: cover_1
           position: !lambda |-
-            return 1.0f - ((float) id(stepper_1).current_position / ${r1_max_kroki}.0f);
+            float raw = (float) id(stepper_1).current_position / ${r1_max_kroki}.0f;
+            float position = id(r1_inverted) ? raw : 1.0f - raw;
+            if (position < 0.0f) return 0.0f;
+            if (position > 1.0f) return 1.0f;
+            return position;
           current_operation: !lambda |-
-            if (id(stepper_1).current_position < id(stepper_1).target_position) {
-              return COVER_OPERATION_CLOSING;
-            } else if (id(stepper_1).current_position > id(stepper_1).target_position) {
-              return COVER_OPERATION_OPENING;
-            } else {
+            if (id(stepper_1).current_position == id(stepper_1).target_position) {
               return COVER_OPERATION_IDLE;
+            }
+            bool moving_to_higher_steps = id(stepper_1).current_position < id(stepper_1).target_position;
+            if (id(r1_inverted)) {
+              return moving_to_higher_steps ? COVER_OPERATION_OPENING : COVER_OPERATION_CLOSING;
+            } else {
+              return moving_to_higher_steps ? COVER_OPERATION_CLOSING : COVER_OPERATION_OPENING;
             }
 
       - cover.template.publish:
           id: cover_2
           position: !lambda |-
-            return 1.0f - ((float) id(stepper_2).current_position / ${r2_max_kroki}.0f);
+            float raw = (float) id(stepper_2).current_position / ${r2_max_kroki}.0f;
+            float position = id(r2_inverted) ? raw : 1.0f - raw;
+            if (position < 0.0f) return 0.0f;
+            if (position > 1.0f) return 1.0f;
+            return position;
           current_operation: !lambda |-
-            if (id(stepper_2).current_position < id(stepper_2).target_position) {
-              return COVER_OPERATION_CLOSING;
-            } else if (id(stepper_2).current_position > id(stepper_2).target_position) {
-              return COVER_OPERATION_OPENING;
-            } else {
+            if (id(stepper_2).current_position == id(stepper_2).target_position) {
               return COVER_OPERATION_IDLE;
+            }
+            bool moving_to_higher_steps = id(stepper_2).current_position < id(stepper_2).target_position;
+            if (id(r2_inverted)) {
+              return moving_to_higher_steps ? COVER_OPERATION_OPENING : COVER_OPERATION_CLOSING;
+            } else {
+              return moving_to_higher_steps ? COVER_OPERATION_CLOSING : COVER_OPERATION_OPENING;
             }
