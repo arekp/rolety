@@ -1,237 +1,192 @@
 esphome:
-  name: rolety1
-  friendly_name: rolety1
+  name: sterownik-rolety-podwojny
+  friendly_name: rolety1_salon
+  platformio_options:
+    board_build.f_cpu: 160000000L
 
-esp32:
-  board: esp32dev
-  framework:
-    type: esp-idf
+esp8266:
+  board: esp01_1m
 
-# ============================================
-# Wi-Fi Konfiguracja
-# ============================================
+logger:
+  level: ERROR
+  baud_rate: 0
+
+api:
+  batch_delay: 0ms
+  encryption:
+    key: "flIgyK3JFxcxcMs="
+
+ota:
+  - platform: esphome
+    password: "xcxcxcccc"
+
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
-
-  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  min_auth_mode: WPA2
+  power_save_mode: NONE
   ap:
     ssid: "Rolety1 Fallback Hotspot"
-    password: "2d890Nt9GLfM"
+    password: "xxxxxxxx"
 
 captive_portal:
 
-# ============================================
-# Enable logging
-# ============================================
-logger:
-  level: INFO
+substitutions:
+  r1_name: "Roleta Lewa"
+  # PODZIELONE PRZEZ 2 (z 20000 na 10000) z racji FULL_STEP
+  r1_max_kroki: "10000"
+  r2_name: "Roleta Prawa"
+  r2_max_kroki: "10000"
+  
+  # Prędkość również podzielona przez 2, aby zachować to samo tempo fizyczne
+  predkosc: "300" 
+  przyspieszenie: "80"
 
-# ============================================
-# Enable Home Assistant API
-# ============================================
-api:
-  encryption:
-    key: "d1K6Qe5PoLYRR0DO3qJanXc4JJPgnMPtkxVUfTIdvf4="
+preferences:
+  flash_write_interval: 1h
 
-# ============================================
-# OTA Updates
-# ============================================
-ota:
-  - platform: esphome
-    password: "da32dc05b4f8badde6840699cc6b25be"
-
-# ============================================
-# Stepper Motor - ULN2003 28BYJ-48
-# NodeMCU v3 pinning: D5-D8 → GPIO14, GPIO2, GPIO13, GPIO27
-# Zmieniono GPIO12 na GPIO2 (GPIO12 to strapping pin)
-# ============================================
 stepper:
   - platform: uln2003
-    id: my_stepper
-    pin_a: GPIO14      # D5 → ULN2003 IN1
-    pin_b: GPIO2       # D4 → ULN2003 IN2 (zmieniono z GPIO12)
-    pin_c: GPIO13      # D7 → ULN2003 IN3
-    pin_d: GPIO27      # D8 → ULN2003 IN4
-    max_speed: 500
-    acceleration: 200
-    deceleration: 200
+    id: stepper_1
+    pin_a: GPIO14
+    pin_b: GPIO12
+    pin_c: GPIO13
+    pin_d: GPIO15
+    max_speed: ${predkosc}
+    acceleration: ${przyspieszenie}
     sleep_when_done: true
+    # MAGIA OPTYMALIZACJI: Pełny krok. Zmniejsza obciążenie ESP o połowę!
+    step_mode: FULL_STEP 
 
-# ============================================
-# Cover (Roleta) z Stepper'em - Template Cover
-# ESPHome 2026.5.3+ - Poprawiona konfiguracja
-# ============================================
+  - platform: uln2003
+    id: stepper_2
+    pin_a: GPIO5
+    pin_b: GPIO4
+    pin_c: GPIO0
+    pin_d: GPIO2
+    max_speed: ${predkosc}
+    acceleration: ${przyspieszenie}
+    sleep_when_done: true
+    step_mode: FULL_STEP
+
 cover:
   - platform: template
-    name: "Rolety1"
-    id: my_cover
-    
-    # Lambda obliczająca obecną pozycję (0.0 = zamknięte, 1.0 = otwarte)
-    lambda: |-
-      return id(my_stepper).current_position / 20000.0;
-    
-    # Otwórz roletę (ustaw target na max)
-    open_action:
-      then:
-        - stepper.set_target:
-            id: my_stepper
-            target: 20000
-        - logger.log: "Roleta: otwieranie..."
-    
-    # Zamknij roletę (ustaw target na 0)
-    close_action:
-      then:
-        - stepper.set_target:
-            id: my_stepper
-            target: 0
-        - logger.log: "Roleta: zamykanie..."
-    
-    # Zatrzymaj roletę (ustaw target na aktualną pozycję)
-    stop_action:
-      then:
-        - stepper.set_target:
-            id: my_stepper
-            target: !lambda 'return id(my_stepper).current_position;'
-        - logger.log: "Roleta: zatrzymana"
-    
-    # Akcja dla ustawienia pozycji z Home Assistant
-    position_action:
-      then:
-        - stepper.set_target:
-            id: my_stepper
-            target: !lambda 'return pos * 20000.0;'
-    
-    # Włącz możliwość ustawienia pozycji na podstawie procentu (Home Assistant)
+    name: ${r1_name}
+    id: cover_1
+    device_class: blind
     has_position: true
-    optimistic: true
-    assumed_state: false
+    open_action:
+      - stepper.set_target:
+          id: stepper_1
+          target: 0
+      - cover.template.publish:
+          id: cover_1
+          current_operation: OPENING
 
-# ============================================
-# Przyciski Sterowania (GPIO)
-# NodeMCU v3: GPIO5 (D1), GPIO4 (D2), GPIO0 (D3)
-# ============================================
-binary_sensor:
-  # Przycisk "Do Góry" (GPIO5 / D1)
-  - platform: gpio
-    pin:
-      number: GPIO5
-      mode: INPUT_PULLUP
-      inverted: true
-    name: "Przycisk Góra"
-    id: btn_up
-    filters:
-      - delayed_on: 20ms
-    on_press:
-      then:
-        - cover.open: my_cover
-  
-  # Przycisk "Do Dołu" (GPIO4 / D2)
-  - platform: gpio
-    pin:
-      number: GPIO4
-      mode: INPUT_PULLUP
-      inverted: true
-    name: "Przycisk Dół"
-    id: btn_down
-    filters:
-      - delayed_on: 20ms
-    on_press:
-      then:
-        - cover.close: my_cover
-  
-  # Przycisk "Stop" (GPIO0 / D3)
-  - platform: gpio
-    pin:
-      number: GPIO0
-      mode: INPUT_PULLUP
-      inverted: true
-    name: "Przycisk Stop"
-    id: btn_stop
-    filters:
-      - delayed_on: 20ms
-    on_press:
-      then:
-        - cover.stop: my_cover
+    close_action:
+      - stepper.set_target:
+          id: stepper_1
+          target: ${r1_max_kroki}
+      - cover.template.publish:
+          id: cover_1
+          current_operation: CLOSING
 
-# ============================================
-# Sensory Diagnostyczne
-# ============================================
-sensor:
-  # WiFi Signal Strength
-  - platform: wifi_signal
-    name: "WiFi Signal"
-    id: wifi_signal
-    update_interval: 60s
+    stop_action:
+      - stepper.set_target:
+          id: stepper_1
+          target: !lambda 'return id(stepper_1).current_position;'
+      - cover.template.publish:
+          id: cover_1
+          position: !lambda |-
+            return 1.0f - ((float) id(stepper_1).current_position / ${r1_max_kroki}.0f);
+          current_operation: IDLE
 
-  # Uptime
-  - platform: uptime
-    name: "Uptime"
-    id: uptime_sensor
-    update_interval: 60s
+    position_action:
+      - stepper.set_target:
+          id: stepper_1
+          target: !lambda 'return (1.0f - pos) * ${r1_max_kroki};'
+      - cover.template.publish:
+          id: cover_1
+          current_operation: !lambda |-
+            if (id(stepper_1).current_position < id(stepper_1).target_position) {
+              return COVER_OPERATION_CLOSING;
+            } else if (id(stepper_1).current_position > id(stepper_1).target_position) {
+              return COVER_OPERATION_OPENING;
+            } else {
+              return COVER_OPERATION_IDLE;
+            }
 
-  # Napięcie Zasilania (GPIO35 / A0)
-  - platform: adc
-    pin: GPIO35
-    attenuation: 11db
-    name: "Napięcie Zasilania"
-    id: power_voltage
-    update_interval: 60s
-    filters:
-      - multiply: 4.2  # Kalibracja dla dzielnika napięcia
+  - platform: template
+    name: ${r2_name}
+    id: cover_2
+    device_class: blind
+    has_position: true
+    open_action:
+      - stepper.set_target:
+          id: stepper_2
+          target: 0
+      - cover.template.publish:
+          id: cover_2
+          current_operation: OPENING
 
-# ============================================
-# Text Sensors
-# ============================================
-text_sensor:
-  # Status WiFi
-  - platform: wifi_info
-    ip_address:
-      name: "IP Adres"
-      id: wifi_ip
-    ssid:
-      name: "SSID"
-      id: wifi_ssid
-    mac_address:
-      name: "MAC Address"
-      id: wifi_mac
+    close_action:
+      - stepper.set_target:
+          id: stepper_2
+          target: ${r2_max_kroki}
+      - cover.template.publish:
+          id: cover_2
+          current_operation: CLOSING
 
-  # Wersja ESPHome
-  - platform: version
-    name: "ESPHome Version"
-    id: esphome_version
+    stop_action:
+      - stepper.set_target:
+          id: stepper_2
+          target: !lambda 'return id(stepper_2).current_position;'
+      - cover.template.publish:
+          id: cover_2
+          position: !lambda |-
+            return 1.0f - ((float) id(stepper_2).current_position / ${r2_max_kroki}.0f);
+          current_operation: IDLE
 
-# ============================================
-# Switches - Sterowanie
-# ============================================
-switch:
-  # Restart
-  - platform: restart
-    name: "Restart NodeMCU v3"
-    id: restart_switch
+    position_action:
+      - stepper.set_target:
+          id: stepper_2
+          target: !lambda 'return (1.0f - pos) * ${r2_max_kroki};'
+      - cover.template.publish:
+          id: cover_2
+          current_operation: !lambda |-
+            if (id(stepper_2).current_position < id(stepper_2).target_position) {
+              return COVER_OPERATION_CLOSING;
+            } else if (id(stepper_2).current_position > id(stepper_2).target_position) {
+              return COVER_OPERATION_OPENING;
+            } else {
+              return COVER_OPERATION_IDLE;
+            }
 
-  # Safe Mode (do aktualizacji)
-  - platform: safe_mode
-    name: "Restart Safe Mode"
-    id: safe_mode_switch
-
-# ============================================
-# Scripts (Możliwe sekwencje działań)
-# ============================================
-script:
-  otwórz_roletę:
+interval:
+  - interval: 500ms
     then:
-      - cover.open: my_cover
-      - delay: 2s
-      - logger.log: "Roleta otwarta"
+      - cover.template.publish:
+          id: cover_1
+          position: !lambda |-
+            return 1.0f - ((float) id(stepper_1).current_position / ${r1_max_kroki}.0f);
+          current_operation: !lambda |-
+            if (id(stepper_1).current_position < id(stepper_1).target_position) {
+              return COVER_OPERATION_CLOSING;
+            } else if (id(stepper_1).current_position > id(stepper_1).target_position) {
+              return COVER_OPERATION_OPENING;
+            } else {
+              return COVER_OPERATION_IDLE;
+            }
 
-  zamknij_roletę:
-    then:
-      - cover.close: my_cover
-      - delay: 2s
-      - logger.log: "Roleta zamknięta"
-
-  stop_roletę:
-    then:
-      - cover.stop: my_cover
-      - logger.log: "Roleta zatrzymana"
+      - cover.template.publish:
+          id: cover_2
+          position: !lambda |-
+            return 1.0f - ((float) id(stepper_2).current_position / ${r2_max_kroki}.0f);
+          current_operation: !lambda |-
+            if (id(stepper_2).current_position < id(stepper_2).target_position) {
+              return COVER_OPERATION_CLOSING;
+            } else if (id(stepper_2).current_position > id(stepper_2).target_position) {
+              return COVER_OPERATION_OPENING;
+            } else {
+              return COVER_OPERATION_IDLE;
+            }
